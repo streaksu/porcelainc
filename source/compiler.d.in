@@ -1,0 +1,5 @@
+module compiler;
+
+immutable compilerName    = "@NAME@";
+immutable compilerVersion = "@VERSION@";
+immutable compilerLicense = "@LICENSE@";

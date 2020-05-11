@@ -1,0 +1,5 @@
+const charArray = ['a', 'c', 'h', 'a', 'r', '\0']
+
+sub main() {
+    charArray[4] == ','
+}
