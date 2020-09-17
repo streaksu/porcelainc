@@ -14,10 +14,3 @@ string readFile(string path) {
 
     assert(0);
 }
-
-void writeFile(string path, string contents) {
-    try
-        write(path, contents);
-    catch (Exception)
-        error("Contents could not be written to '" ~ path ~ "'");
-}

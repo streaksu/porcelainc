@@ -1,29 +1,30 @@
 module main;
 
-import core.stdc.stdlib;
-import std.stdio;
-import std.getopt;
-import backend.c;
-import frontend.lexer;
-import frontend.parser;
-import utils.messages;
-import utils.files;
-import compiler;
+import core.stdc.stdlib: exit;
+import std.stdio:        File, writefln;
+import std.getopt:       config, getopt, defaultGetoptPrinter;
+import backend.c:        genCode;
+import frontend.lexer:   lexSource;
+import frontend.parser:  parseTokens;
+import utils.messages:   error;
+import utils.files:      readFile;
+import compiler:         compilerName, compilerVersion, compilerLicense;
 
 void main(string[] args) {
     // Get command line flags.
-    bool   printVersion = false;
-    string sourcepath   = "/dev/stdin";
-    string outputpath   = "/dev/stdout";
-    bool   onlyparse    = false;
+    string sourcepath;
+    string outputpath;
+    bool   printVersion;
+    bool   onlyparse;
 
     try {
         auto cml = getopt(
             args,
+            config.caseSensitive,
+            config.required, "c", "Set a file to compile", &sourcepath,
+            config.required, "o", "Set the output file",   &outputpath,
             "V|version", "Print the version and targets",  &printVersion,
-            "P|parse",   "Only parse, no compilation",     &onlyparse,
-            "c|source",  "Set the source file to compile", &sourcepath,
-            "o|output",  "Set the output file",            &outputpath
+            "P|parse",   "Only parse, no compilation",     &onlyparse
         );
 
         if (cml.helpWanted) {
@@ -40,6 +41,14 @@ void main(string[] args) {
         exit(0);
     }
 
+    // Frontend processing.
+    /*File sourceo;
+    try {
+        sourceo = File(sourcepath, "r");
+    } catch (Exception e) {
+        error(sourcepath ~ " couldn't be read: " ~ e.msg);
+    }*/
+
     auto source = readFile(sourcepath);
     auto tokens = lexSource(sourcepath, source);
     auto ast    = parseTokens(tokens);
@@ -48,6 +57,12 @@ void main(string[] args) {
         return;
     }
 
-    auto output = genCode(sourcepath, outputpath, ast);
-    writeFile(outputpath, output);
+    File output;
+    try {
+        output = File(outputpath, "w");
+    } catch (Exception e) {
+        error(outputpath ~ " couldn't be written: " ~ e.msg);
+    }
+
+    genCode(output, ast);
 }

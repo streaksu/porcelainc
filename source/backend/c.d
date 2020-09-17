@@ -1,443 +1,360 @@
 module backend.c;
 
-import std.array;
+import std.stdio: File;
 import backend.builtins;
 import frontend.ast;
 import utils.messages;
 import compiler;
 
-string genCode(string source, string output, AST ast) {
-    auto code = appender!string;
-
+void genCode(File output, AST ast) {
     // Header for our output.
-    code.put("// Outputted by " ~ compilerName ~ " " ~ compilerVersion ~ "\n");
-    code.put("// Source generated from the file '" ~ source ~ "'\n");
-    code.put("// Basic needed headers\n");
-    code.put("#include <stdbool.h>\n");
-    code.put("#include <stdlib.h>\n");
-    code.put("#include <stdio.h>\n");
-    code.put("#include <string.h>\n");
-    code.put("\n");
+    output.write("// " ~ compilerName ~ " " ~ compilerVersion ~ "\n");
+    output.write("// Basic needed headers\n");
+    output.write("#include <stdbool.h>\n");
+    output.write("#include <stdlib.h>\n");
+    output.write("#include <stdio.h>\n");
+    output.write("#include <string.h>\n");
+    output.write("\n");
 
     // Builtins.
-    code.put(printBuiltin);
-    code.put("\n");
-    code.put(warnBuiltin);
-    code.put("\n");
-    code.put(dieBuiltin);
-    code.put("\n");
-    code.put(rangeBuiltin);
-    code.put("\n");
+    output.write(printBuiltin);
+    output.write("\n");
+    output.write(warnBuiltin);
+    output.write("\n");
+    output.write(dieBuiltin);
+    output.write("\n");
+    output.write(rangeBuiltin);
+    output.write("\n");
 
     // First, put the signatures.
     foreach (decl; ast.body) {
-        code.put(generateSignature(decl));
+        generateSignature(output, decl);
     }
 
-    code.put("\n");
+    output.write("\n");
 
     // Now, put the actual declarations to match the signatures.
     foreach (decl; ast.body) {
-        code.put(generateDeclaration(decl));
+        generateDeclaration(output, decl);
     }
-
-    return code.data;
 }
 
-private string generateSignature(Declaration decl) {
+private void generateSignature(File output, Declaration decl) {
     if (auto _ = cast(Constant)decl) {
-        return generateSignature(_);
+        generateSignature(output, _);
     } else if (auto _ = cast(Subroutine)decl) {
-        return generateSignature(_);
+        generateSignature(output, _);
     } else {
         internalError("Declaration has no signature routine");
     }
-
-    assert(false);
 }
 
-private string generateSubroutineSignature(Subroutine s) {
-    auto code = appender!string;
-
-    code.put("size_t ");
-    code.put(s.identifier);
-    code.put("(");
+private void generateSubroutineSignature(File output, Subroutine s) {
+    output.write("size_t ");
+    output.write(s.identifier);
+    output.write("(");
 
     auto first = true;
 
     foreach (parameter; s.parameters) {
-        if (!first) code.put(", ");
+        if (!first) output.write(", ");
 
-        code.put("size_t ");
+        output.write("size_t ");
 
-        code.put(parameter);
+        output.write(parameter);
 
         first = false;
     }
 
     if (first) {
-        code.put("void");
+        output.write("void");
     }
 
-    code.put(")");
-
-    return code.data;
+    output.write(")");
 }
 
-private string generateSignature(Constant c) {
-    auto code = appender!string;
-
-    code.put("const size_t ");
-    code.put(c.identifier);
-    code.put(" = ");
-    code.put(generateExpression(c.value, 1));
-    code.put(";\n");
-
-    return code.data;
+private void generateSignature(File output, Constant c) {
+    output.write("const size_t ");
+    output.write(c.identifier);
+    output.write(" = ");
+    generateExpression(output, c.value, 1);
+    output.write(";\n");
 }
 
-private string generateSignature(Subroutine s) {
-    return generateSubroutineSignature(s) ~ ";\n";
+private void generateSignature(File output, Subroutine s) {
+    generateSubroutineSignature(output, s);
+    output.write(";\n");
 }
 
-private string generateDeclaration(Declaration decl) {
+private void generateDeclaration(File output, Declaration decl) {
     if (auto _ = cast(Constant)decl) {
-        return "";
+        return;
     } else if (auto _ = cast(Subroutine)decl) {
-        return generateDeclaration(_);
+        generateDeclaration(output, _);
     } else {
         internalError("Declaration has no declaration routine");
     }
-    assert(false);
 }
 
-private string generateDeclaration(Subroutine s) {
-    auto code = appender!string;
-
-    code.put(generateSubroutineSignature(s));
-    code.put("{\n");
-    code.put("\treturn ");
-    code.put(generateExpression(s.body, 1));
-    code.put(";\n");
-    code.put("}\n");
-
-    return code.data;
+private void generateDeclaration(File output, Subroutine s) {
+    generateSubroutineSignature(output, s);
+    output.write("{\n");
+    output.write("\treturn ");
+    generateExpression(output, s.body, 1);
+    output.write(";\n");
+    output.write("}\n");
 }
 
-private string generateExpression(Expression expr, uint i) {
+private void generateExpression(File output, Expression expr, uint i) {
     if (auto _ = cast(Array)expr)
-        return generateExpression(_, i);
+        generateExpression(output, _, i);
     else if (auto _ = cast(If)expr)
-        return generateExpression(_, i);
+        generateExpression(output, _, i);
     else if (auto _ = cast(Match)expr)
-        return generateExpression(_, i);
+        generateExpression(output, _, i);
     else if (auto _ = cast(Where)expr)
-        return generateExpression(_, i);
+        generateExpression(output, _, i);
     else if (auto _ = cast(Or)expr)
-        return generateExpression(_, i);
+        generateExpression(output, _, i);
     else if (auto _ = cast(And)expr)
-        return generateExpression(_, i);
+        generateExpression(output, _, i);
     else if (auto _ = cast(Equality)expr)
-        return generateExpression(_, i);
+        generateExpression(output, _, i);
     else if (auto _ = cast(Comparative)expr)
-        return generateExpression(_, i);
+        generateExpression(output, _, i);
     else if (auto _ = cast(Additive)expr)
-        return generateExpression(_, i);
+        generateExpression(output, _, i);
     else if (auto _ = cast(Multiplicative)expr)
-        return generateExpression(_, i);
+        generateExpression(output, _, i);
     else
         internalError("Expression has no function");
-
-    assert(false);
 }
 
-private string generateExpression(Array ie, uint i) {
-    auto code = appender!string;
-
-    code.put("{");
+private void generateExpression(File output, Array ie, uint i) {
+    output.write("{");
 
     auto first = true;
 
     foreach (member; ie.members) {
-        if (!first) code.put(", ");
+        if (!first) output.write(", ");
 
-        code.put(generateExpression(member, i));
+        generateExpression(output, member, i);
 
         first = false;
     }
 
-    code.put("}");
-
-    return code.data;
+    output.write("}");
 }
 
-private string generateExpression(If ie, uint i) {
-    auto code = appender!string;
-
-    code.put(generateExpression(ie.condition, i));
-    code.put(" ? ");
-    code.put(generateExpression(ie.ifBranch, i));
-    code.put(" : ");
-    code.put(generateExpression(ie.elseBranch, i));
-
-    return code.data;
+private void generateExpression(File output, If ie, uint i) {
+    generateExpression(output, ie.condition, i);
+    output.write(" ? ");
+    generateExpression(output, ie.ifBranch, i);
+    output.write(" : ");
+    generateExpression(output, ie.elseBranch, i);
 }
 
 // TODO: Reimplementing match and where is a must to leave GNU C and output
 //       ANSI C, since it does not support statement-expressions
-private string generateExpression(Match m, uint i) {
-    auto code = appender!string;
-
-    code.put("({\n");
+private void generateExpression(File output, Match m, uint i) {
+    output.write("({\n");
 
     i += 1;
 
-    code.put(generateIndentation(i));
-    code.put("int __porcelainc_MatchingValue;\n");
+    generateIndentation(output, i);
+    output.write("int __porcelainc_MatchingValue;\n");
 
     auto first = true;
 
     foreach (caseTuple; m.cases) {
-        code.put(generateIndentation(i));
+        generateIndentation(output, i);
 
-        if (!first) code.put("else ");
+        if (!first) output.write("else ");
 
-        code.put("if (");
-        code.put(generateExpression(m.matched, i));
-        code.put(" == ");
-        code.put(generateExpression(caseTuple[0], i));
-        code.put(") __porcelainc_MatchingValue = ");
-        code.put(generateExpression(caseTuple[1], i));
-        code.put(";\n");
+        output.write("if (");
+        generateExpression(output, m.matched, i);
+        output.write(" == ");
+        generateExpression(output, caseTuple[0], i);
+        output.write(") __porcelainc_MatchingValue = ");
+        generateExpression(output, caseTuple[1], i);
+        output.write(";\n");
 
         first = false;
     }
 
-    code.put(generateIndentation(i));
-    code.put("else __porcelainc_MatchingValue = ");
-    code.put(generateExpression(m.otherwise, i));
-    code.put(";\n");
+    generateIndentation(output, i);
+    output.write("else __porcelainc_MatchingValue = ");
+    generateExpression(output, m.otherwise, i);
+    output.write(";\n");
 
-    code.put(generateIndentation(i));
-    code.put("__porcelainc_MatchingValue;\n");
+    generateIndentation(output, i);
+    output.write("__porcelainc_MatchingValue;\n");
 
     i -= 1;
 
-    code.put(generateIndentation(i));
-    code.put("})");
-
-    return code.data;
+    generateIndentation(output, i);
+    output.write("})");
 }
 
-private string generateExpression(Where w, uint i) {
-    auto code = appender!string;
-
-    code.put("({\n");
+private void generateExpression(File output, Where w, uint i) {
+    output.write("({\n");
 
     i += 1;
 
     foreach (var; w.variables) {
-        code.put(generateIndentation(i));
-        code.put("int ");
-        code.put(var[0]);
-        code.put(" = ");
-        code.put(generateExpression(var[1], i));
-        code.put(";\n");
+        generateIndentation(output, i);
+        output.write("int ");
+        output.write(var[0]);
+        output.write(" = ");
+        generateExpression(output, var[1], i);
+        output.write(";\n");
     }
 
-    code.put(generateIndentation(i));
-    code.put(generateExpression(w.expression, i));
-    code.put(";\n");
+    generateIndentation(output, i);
+    generateExpression(output, w.expression, i);
+    output.write(";\n");
 
     i -= 1;
 
-    code.put(generateIndentation(i));
-    code.put("})");
-
-    return code.data;
+    generateIndentation(output, i);
+    output.write("})");
 }
 
-private string generateExpression(Or o, uint i) {
-    auto code = appender!string;
-
-    code.put(generateExpression(o.left, i));
-    code.put(" || ");
-    code.put(generateExpression(o.right, i));
-
-    return code.data;
+private void generateExpression(File output, Or o, uint i) {
+    generateExpression(output, o.left, i);
+    output.write(" || ");
+    generateExpression(output, o.right, i);
 }
 
-private string generateExpression(And a, uint i) {
-    auto code = appender!string;
-
-    code.put(generateExpression(a.left, i));
-    code.put(" && ");
-    code.put(generateExpression(a.right, i));
-
-    return code.data;
+private void generateExpression(File output, And a, uint i) {
+    generateExpression(output, a.left, i);
+    output.write(" && ");
+    generateExpression(output, a.right, i);
 }
 
-private string generateExpression(Equality e, uint i) {
-    auto code = appender!string;
-
-    code.put(generateExpression(e.left, i));
-    code.put(" ");
-    code.put(e.operator == EqualityOperator.Equals ? "==" : "!=");
-    code.put(" ");
-    code.put(generateExpression(e.right, i));
-
-    return code.data;
+private void generateExpression(File output, Equality e, uint i) {
+    generateExpression(output, e.left, i);
+    output.write(" ");
+    output.write(e.operator == EqualityOperator.Equals ? "==" : "!=");
+    output.write(" ");
+    generateExpression(output, e.right, i);
 }
 
-private string generateExpression(Comparative c, uint i) {
-    auto code = appender!string;
-
-    code.put(generateExpression(c.left, i));
-    code.put(" ");
+private void generateExpression(File output, Comparative c, uint i) {
+    generateExpression(output, c.left, i);
+    output.write(" ");
 
     switch (c.operator) {
         case ComparativeOperator.LessOrEqual:
-            code.put("<=");
+            output.write("<=");
             break;
         case ComparativeOperator.GreaterOrEqual:
-            code.put(">=");
+            output.write(">=");
             break;
         case ComparativeOperator.Less:
-            code.put("<");
+            output.write("<");
             break;
         default:
-            code.put(">");
+            output.write(">");
     }
 
-    code.put(" ");
-    code.put(generateExpression(c.right, i));
-
-    return code.data;
+    output.write(" ");
+    generateExpression(output, c.right, i);
 }
 
-private string generateExpression(Additive a, uint i) {
-    auto code = appender!string;
-
-    code.put(generateExpression(a.left, i));
-    code.put(" ");
-    code.put(a.operator == AdditiveOperator.Plus ? "+" : "-");
-    code.put(" ");
-    code.put(generateExpression(a.right, i));
-
-    return code.data;
+private void generateExpression(File output, Additive a, uint i) {
+    generateExpression(output, a.left, i);
+    output.write(" ");
+    output.write(a.operator == AdditiveOperator.Plus ? "+" : "-");
+    output.write(" ");
+    generateExpression(output, a.right, i);
 }
 
-private string generateExpression(Multiplicative m, uint i) {
-    auto code = appender!string;
-
+private void generateExpression(File output, Multiplicative m, uint i) {
     if (m.right is null) {
-        code.put(generateFactor(m.left, i));
+        generateFactor(output, m.left, i);
     } else {
-        code.put(generateFactor(m.left, i));
-        code.put(" ");
+        generateFactor(output, m.left, i);
+        output.write(" ");
 
         switch (m.operator) {
             case MultiplicativeOperator.Multiplication:
-                code.put("*");
+                output.write("*");
                 break;
             case MultiplicativeOperator.Division:
-                code.put("/");
+                output.write("/");
                 break;
             default:
-                code.put("%");
+                output.write("%");
         }
 
-        code.put(" ");
-        code.put(generateFactor(m.right, i));
+        output.write(" ");
+        generateFactor(output, m.right, i);
     }
-
-    return code.data;
 }
 
-private string generateFactor(Factor fac, uint i) {
+private void generateFactor(File output, Factor fac, uint i) {
     if (auto _ = cast(Grouping)fac)
-        return generateFactor(_, i);
+        generateFactor(output, _, i);
     else if (auto _ = cast(Unary)fac)
-        return generateFactor(_, i);
+        generateFactor(output, _, i);
     else if (auto _ = cast(SubroutineCall)fac)
-        return generateFactor(_, i);
+        generateFactor(output, _, i);
     else if (auto _ = cast(ArrayMember)fac)
-        return generateFactor(_, i);
+        generateFactor(output, _, i);
     else if (auto _ = cast(Identifier)fac)
-        return generateFactor(_);
+        generateFactor(output, _);
     else if (auto _ = cast(Literal)fac)
-        return generateFactor(_);
+        generateFactor(output, _);
     else
         internalError("Factor has no function");
-
-    assert(false);
 }
 
-private string generateFactor(Grouping g, uint i) {
-    auto code = appender!string;
-
-    code.put("(");
-    code.put(generateExpression(g.contents, i));
-    code.put(")");
-
-    return code.data;
+private void generateFactor(File output, Grouping g, uint i) {
+    output.write("(");
+    generateExpression(output, g.contents, i);
+    output.write(")");
 }
 
-private string generateFactor(Unary u, uint i) {
-    auto code = appender!string;
-
-    code.put(u.operator == UnaryOperator.Not ? "!" : "-");
-    code.put(generateFactor(u.affected, i));
-
-    return code.data;
+private void generateFactor(File output, Unary u, uint i) {
+    output.write(u.operator == UnaryOperator.Not ? "!" : "-");
+    generateFactor(output, u.affected, i);
 }
 
-private string generateFactor(SubroutineCall sc, uint i) {
-    auto code = appender!string;
-
-    code.put(sc.identifier);
-    code.put("(");
+private void generateFactor(File output, SubroutineCall sc, uint i) {
+    output.write(sc.identifier);
+    output.write("(");
 
     auto first = true;
 
     foreach (argument; sc.arguments) {
-        if (!first) code.put(", ");
+        if (!first) output.write(", ");
 
-        code.put(generateExpression(argument, i));
+        generateExpression(output, argument, i);
 
         first = false;
     }
 
-    code.put(")");
-
-    return code.data;
+    output.write(")");
 }
 
-private string generateFactor(ArrayMember sc, uint i) {
-    auto code = appender!string;
-
-    code.put(sc.identifier);
-    code.put("[");
-    code.put(generateExpression(sc.index, i));
-    code.put("]");
-
-    return code.data;
+private void generateFactor(File output, ArrayMember sc, uint i) {
+    output.write(sc.identifier);
+    output.write("[");
+    generateExpression(output, sc.index, i);
+    output.write("]");
 }
 
-private string generateFactor(Identifier v) {
-    return v.identifier;
+private void generateFactor(File output, Identifier v) {
+    return output.write(v.identifier);
 }
 
-private string generateFactor(Literal l) {
-    return l.value;
+private void generateFactor(File output, Literal l) {
+    return output.write(l.value);
 }
 
-private string generateIndentation(uint level) {
-    auto tabulation = appender!string;
-
+private void generateIndentation(File output, uint level) {
     foreach (i; 0..level) {
-        tabulation.put("\t");
+        output.write("\t");
     }
-
-    return tabulation.data;
 }
